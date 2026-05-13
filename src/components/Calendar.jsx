@@ -38,6 +38,7 @@ export default function Calendar() {
         if (newStatus !== 'clear') return [...filtered, { date: dateStr, status: newStatus }]
         return filtered
       })
+      window.dispatchEvent(new Event('streak-updated'))
       toast.success(newStatus === 'clear' ? 'Day cleared' : `Marked as ${newStatus}`)
     } catch { toast.error('Failed to update day') }
   }

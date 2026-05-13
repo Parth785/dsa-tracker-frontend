@@ -24,9 +24,14 @@ export default function Layout() {
 
   const location = useLocation()
 
-useEffect(() => {
-  streakApi.getStats().then(r => setStreak(r.data.currentStreak)).catch(() => {})
-}, [location.pathname])
+  useEffect(() => {
+    const fetchStreak = () => {
+      streakApi.getStats().then(r => setStreak(r.data.currentStreak)).catch(() => {})
+    }
+    fetchStreak()
+    window.addEventListener('streak-updated', fetchStreak)
+    return () => window.removeEventListener('streak-updated', fetchStreak)
+  }, [location.pathname])
 
   const handleLogout = () => { logout(); navigate('/login') }
 
