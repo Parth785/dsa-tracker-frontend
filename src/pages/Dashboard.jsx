@@ -15,7 +15,12 @@ export default function Dashboard() {
   useEffect(() => {
     const load = () => {
       Promise.all([streakApi.getStats(), problemApi.getAll()])
-        .then(([s, p]) => { setStats(s.data); setProblems(p.data) })
+        .then(([s, p]) => {
+          setStats(s.data)
+          setProblems(p.data)
+          setLoading(false)
+        })
+        .catch(() => setLoading(false))
     }
     load()
     window.addEventListener('streak-updated', load)
