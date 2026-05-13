@@ -13,9 +13,13 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    Promise.all([streakApi.getStats(), problemApi.getAll()])
-      .then(([s, p]) => { setStats(s.data); setProblems(p.data) })
-      .finally(() => setLoading(false))
+    const load = () => {
+      Promise.all([streakApi.getStats(), problemApi.getAll()])
+        .then(([s, p]) => { setStats(s.data); setProblems(p.data) })
+    }
+    load()
+    window.addEventListener('streak-updated', load)
+    return () => window.removeEventListener('streak-updated', load)
   }, [])
 
   const hour = new Date().getHours()

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { streakApi, problemApi } from '../api'
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isToday, isFuture, parseISO } from 'date-fns'
 import toast from 'react-hot-toast'
-import { Modal } from './UI'
+import { Modal, Btn } from './UI'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 
 export default function Calendar() {
@@ -17,14 +17,13 @@ export default function Calendar() {
     problemApi.getAll().then(r => setProblems(r.data)).catch(() => {})
   }, [])
 
+  // rebuild map every render so UI is always in sync
   const dayStatusMap = {}
   calendarDays.forEach(d => { dayStatusMap[d.date] = d.status })
 
   const monthStart = startOfMonth(currentMonth)
   const monthEnd = endOfMonth(currentMonth)
   const days = eachDayOfInterval({ start: monthStart, end: monthEnd })
-
-  // Fill empty slots before month starts (Mon = 0)
   const startWd = (getDay(monthStart) + 6) % 7
   const blanks = Array(startWd).fill(null)
 
@@ -33,6 +32,7 @@ export default function Calendar() {
       const existing = dayStatusMap[dateStr]
       const newStatus = existing === status ? 'clear' : status
       await streakApi.markDay({ date: dateStr, status: newStatus })
+      // optimistic update — no refresh needed
       setCalendarDays(prev => {
         const filtered = prev.filter(d => d.date !== dateStr)
         if (newStatus !== 'clear') return [...filtered, { date: dateStr, status: newStatus }]
@@ -45,15 +45,17 @@ export default function Calendar() {
 
   const openDay = (dateStr) => {
     setSelectedDay(dateStr)
-    const dp = problems.filter(p => p.date === dateStr)
-    setDayProblems(dp)
+    setDayProblems(problems.filter(p => p.date === dateStr))
   }
 
+  const todayStr = format(new Date(), 'yyyy-MM-dd')
+  const todayStatus = dayStatusMap[todayStr]
   const DIFF_COLOR = { Easy: 'var(--green)', Medium: 'var(--amber)', Hard: 'var(--red)' }
 
   return (
     <>
       <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
+
         {/* Month nav */}
         <div style={{ padding: '13px 18px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ fontFamily: 'var(--font-head)', fontSize: 12, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.06em' }}>
@@ -75,6 +77,7 @@ export default function Calendar() {
         </div>
 
         <div style={{ padding: 14 }}>
+
           {/* Weekday headers */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 3, marginBottom: 4 }}>
             {['M','T','W','T','F','S','S'].map((d, i) => (
@@ -95,15 +98,15 @@ export default function Calendar() {
               if (status === 'done') { bg = 'var(--green-dim)'; border = '1px solid var(--green)'; color = 'var(--green)' }
               if (status === 'skip') { bg = 'var(--red-dim)'; border = '1px solid var(--red)'; color = 'var(--red)' }
               if (isToday(day)) border = '1.5px solid var(--blue)'
-              if (future) { color = 'var(--dim)' }
 
               return (
                 <div key={ds} onClick={() => !future && openDay(ds)}
                   style={{
                     aspectRatio: 1, borderRadius: 8, display: 'flex', flexDirection: 'column',
-                    alignItems: 'center', justifyContent: 'center', cursor: future ? 'default' : 'pointer',
-                    bg, background: bg, border, color, fontSize: 11,
-                    fontFamily: 'var(--font-mono)', transition: 'all .15s', position: 'relative',
+                    alignItems: 'center', justifyContent: 'center',
+                    cursor: future ? 'default' : 'pointer',
+                    background: bg, border, color, fontSize: 11,
+                    fontFamily: 'var(--font-mono)', transition: 'all .15s',
                     opacity: future ? .35 : 1,
                   }}
                 >
@@ -130,16 +133,40 @@ export default function Calendar() {
             ))}
           </div>
 
-          {/* Quick mark buttons for today */}
-          <div style={{ marginTop: 12, display: 'flex', gap: 6, justifyContent: 'center' }}>
-            <button onClick={() => markDay(format(new Date(), 'yyyy-MM-dd'), 'done')} style={{
-              padding: '5px 14px', borderRadius: 99, fontSize: 12, cursor: 'pointer',
-              background: 'var(--green-dim)', color: 'var(--green)', border: '1px solid var(--green-dim)',
-            }}>✓ Mark today done</button>
-            <button onClick={() => markDay(format(new Date(), 'yyyy-MM-dd'), 'skip')} style={{
-              padding: '5px 14px', borderRadius: 99, fontSize: 12, cursor: 'pointer',
-              background: 'var(--red-dim)', color: 'var(--red)', border: '1px solid var(--red-dim)',
-            }}>✕ Mark skipped</button>
+          {/* Smart today buttons — changes based on current status */}
+          <div style={{ marginTop: 12, display: 'flex', gap: 6, justifyContent: 'center', alignItems: 'center' }}>
+            {todayStatus === 'done' ? (
+              <>
+                <span style={{ fontSize: 12, color: 'var(--green)' }}>✅ Today marked as done</span>
+                <button onClick={() => markDay(todayStr, 'done')} style={{
+                  padding: '5px 12px', borderRadius: 99, fontSize: 12, cursor: 'pointer',
+                  background: 'var(--red-dim)', color: 'var(--red)', border: '1px solid var(--red)',
+                }}>✕ Clear</button>
+              </>
+            ) : todayStatus === 'skip' ? (
+              <>
+                <span style={{ fontSize: 12, color: 'var(--red)' }}>✕ Today marked as skipped</span>
+                <button onClick={() => markDay(todayStr, 'done')} style={{
+                  padding: '5px 12px', borderRadius: 99, fontSize: 12, cursor: 'pointer',
+                  background: 'var(--green-dim)', color: 'var(--green)', border: '1px solid var(--green)',
+                }}>Mark done instead</button>
+                <button onClick={() => markDay(todayStr, 'skip')} style={{
+                  padding: '5px 12px', borderRadius: 99, fontSize: 12, cursor: 'pointer',
+                  background: 'var(--red-dim)', color: 'var(--red)', border: '1px solid var(--red)',
+                }}>Clear</button>
+              </>
+            ) : (
+              <>
+                <button onClick={() => markDay(todayStr, 'done')} style={{
+                  padding: '5px 14px', borderRadius: 99, fontSize: 12, cursor: 'pointer',
+                  background: 'var(--green-dim)', color: 'var(--green)', border: '1px solid var(--green)',
+                }}>✓ Mark today done</button>
+                <button onClick={() => markDay(todayStr, 'skip')} style={{
+                  padding: '5px 14px', borderRadius: 99, fontSize: 12, cursor: 'pointer',
+                  background: 'var(--red-dim)', color: 'var(--red)', border: '1px solid var(--red)',
+                }}>✕ Mark skipped</button>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -147,15 +174,16 @@ export default function Calendar() {
       {/* Day detail modal */}
       <Modal open={!!selectedDay} onClose={() => setSelectedDay(null)}
         title={selectedDay ? format(parseISO(selectedDay), 'EEEE, MMMM d yyyy') : ''}>
+
         {dayProblems.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--muted)', fontSize: 13 }}>
             No problems logged on this day.
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
             {dayProblems.map(p => (
               <div key={p.id} style={{ padding: 14, background: 'var(--surface2)', borderRadius: 10, border: '1px solid var(--border)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
                   <span style={{ fontWeight: 600, fontSize: 14 }}>{p.name}</span>
                   {p.lcNumber && <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--dim)' }}>#{p.lcNumber}</span>}
                   <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 99, background: 'var(--purple-dim)', color: 'var(--purple)', fontFamily: 'var(--font-mono)' }}>{p.pattern}</span>
@@ -168,17 +196,37 @@ export default function Calendar() {
           </div>
         )}
 
-        {/* Quick mark from modal */}
+        {/* Smart modal mark buttons */}
         {selectedDay && (
-          <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
-            <button onClick={() => { markDay(selectedDay, 'done'); setSelectedDay(null) }} style={{
-              flex: 1, padding: '8px', borderRadius: 8, fontSize: 13, cursor: 'pointer',
-              background: 'var(--green-dim)', color: 'var(--green)', border: '1px solid var(--green)',
-            }}>Mark done</button>
-            <button onClick={() => { markDay(selectedDay, 'skip'); setSelectedDay(null) }} style={{
-              flex: 1, padding: '8px', borderRadius: 8, fontSize: 13, cursor: 'pointer',
-              background: 'var(--red-dim)', color: 'var(--red)', border: '1px solid var(--red)',
-            }}>Mark skipped</button>
+          <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+            {dayStatusMap[selectedDay] === 'done' ? (
+              <>
+                <div style={{ fontSize: 13, color: 'var(--green)', display: 'flex', alignItems: 'center', gap: 6, flex: 1 }}>
+                  ✅ Already marked done
+                </div>
+                <Btn size="sm" variant="danger" onClick={() => { markDay(selectedDay, 'done'); setSelectedDay(null) }}>
+                  Clear
+                </Btn>
+              </>
+            ) : dayStatusMap[selectedDay] === 'skip' ? (
+              <>
+                <Btn size="sm" onClick={() => { markDay(selectedDay, 'done'); setSelectedDay(null) }}>
+                  Mark done instead
+                </Btn>
+                <Btn size="sm" variant="danger" onClick={() => { markDay(selectedDay, 'skip'); setSelectedDay(null) }}>
+                  Clear
+                </Btn>
+              </>
+            ) : (
+              <>
+                <Btn size="sm" onClick={() => { markDay(selectedDay, 'done'); setSelectedDay(null) }}>
+                  Mark done
+                </Btn>
+                <Btn size="sm" variant="secondary" onClick={() => { markDay(selectedDay, 'skip'); setSelectedDay(null) }}>
+                  Mark skipped
+                </Btn>
+              </>
+            )}
           </div>
         )}
       </Modal>
