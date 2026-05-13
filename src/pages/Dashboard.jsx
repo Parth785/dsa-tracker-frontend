@@ -23,8 +23,18 @@ export default function Dashboard() {
         .catch(() => setLoading(false))
     }
     load()
-    window.addEventListener('streak-updated', load)
-    return () => window.removeEventListener('streak-updated', load)
+  
+    const handleStreakUpdate = (e) => {
+      const { status } = e.detail || {}
+      setStats(prev => {
+        if (!prev) return prev
+        const delta = status === 'done' ? 1 : status === 'clear' ? -1 : 0
+        return { ...prev, currentStreak: Math.max(0, prev.currentStreak + delta) }
+      })
+    }
+  
+    window.addEventListener('streak-updated', handleStreakUpdate)
+    return () => window.removeEventListener('streak-updated', handleStreakUpdate)
   }, [])
 
   const hour = new Date().getHours()

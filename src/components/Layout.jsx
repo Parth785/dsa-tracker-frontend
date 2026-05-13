@@ -25,13 +25,18 @@ export default function Layout() {
   const location = useLocation()
 
   useEffect(() => {
-    const fetchStreak = () => {
-      streakApi.getStats().then(r => setStreak(r.data.currentStreak)).catch(() => {})
-    }
-    fetchStreak()
-    window.addEventListener('streak-updated', fetchStreak)
-    return () => window.removeEventListener('streak-updated', fetchStreak)
+    streakApi.getStats().then(r => setStreak(r.data.currentStreak)).catch(() => {})
   }, [location.pathname])
+  
+  useEffect(() => {
+    const handleStreakUpdate = (e) => {
+      const { status } = e.detail || {}
+      if (status === 'done') setStreak(s => s + 1)
+      else if (status === 'clear') setStreak(s => Math.max(0, s - 1))
+    }
+    window.addEventListener('streak-updated', handleStreakUpdate)
+    return () => window.removeEventListener('streak-updated', handleStreakUpdate)
+  }, [])
 
   const handleLogout = () => { logout(); navigate('/login') }
 

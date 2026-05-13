@@ -28,19 +28,32 @@ export default function Calendar() {
   const blanks = Array(startWd).fill(null)
 
   const markDay = async (dateStr, status) => {
+    const existing = dayStatusMap[dateStr]
+    const newStatus = existing === status ? 'clear' : status
+    
+    // 1. Update calendar UI instantly
+    setCalendarDays(prev => {
+      const filtered = prev.filter(d => d.date !== dateStr)
+      if (newStatus !== 'clear') return [...filtered, { date: dateStr, status: newStatus }]
+      return filtered
+    })
+  
+    // 2. Fire event instantly so sidebar + dashboard update immediately
+    window.dispatchEvent(new CustomEvent('streak-updated', { detail: { date: dateStr, status: newStatus } }))
+    
+    // 3. Sync with backend silently in background
     try {
-      const existing = dayStatusMap[dateStr]
-      const newStatus = existing === status ? 'clear' : status
       await streakApi.markDay({ date: dateStr, status: newStatus })
-      // optimistic update — no refresh needed
+      toast.success(newStatus === 'clear' ? 'Day cleared' : `Marked as ${newStatus}`)
+    } catch {
+      // Revert on failure
       setCalendarDays(prev => {
         const filtered = prev.filter(d => d.date !== dateStr)
-        if (newStatus !== 'clear') return [...filtered, { date: dateStr, status: newStatus }]
+        if (existing) return [...filtered, { date: dateStr, status: existing }]
         return filtered
       })
-      window.dispatchEvent(new Event('streak-updated'))
-      toast.success(newStatus === 'clear' ? 'Day cleared' : `Marked as ${newStatus}`)
-    } catch { toast.error('Failed to update day') }
+      toast.error('Failed to update day')
+    }
   }
 
   const openDay = (dateStr) => {
