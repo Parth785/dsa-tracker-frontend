@@ -56,7 +56,8 @@ export default function LogProblem() {
       else { await problemApi.create(payload); toast.success('Problem logged!') }
       navigate('/problems')
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to save')
+      toast.error(err.cleanMessage || 'Something went wrong')
+
     } finally { setLoading(false) }
   }
 

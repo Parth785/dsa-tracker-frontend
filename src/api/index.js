@@ -19,7 +19,17 @@ api.interceptors.response.use(
       localStorage.removeItem('dsa_token')
       localStorage.removeItem('dsa_user')
       window.location.href = '/login'
+      return Promise.reject(err)
     }
+
+    // Extract clean message from backend
+    const message = err.response?.data?.message
+      || err.response?.data?.error
+      || (err.code === 'ERR_NETWORK' ? 'Cannot reach server. Check your connection.' : null)
+      || (err.code === 'ECONNABORTED' ? 'Request timed out. Please try again.' : null)
+      || 'Something went wrong. Please try again.'
+
+    err.cleanMessage = message
     return Promise.reject(err)
   }
 )

@@ -19,7 +19,7 @@ export default function Register() {
       toast.success('Account created! Let\'s grind.')
       navigate('/')
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Registration failed')
+      toast.error(err.cleanMessage || 'Something went wrong')
     } finally {
       setLoading(false)
     }
